@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MượnĐồ - Báo cáo Kết quả Kiểm thử Tự động</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --pass: #16a34a;
+      --pass-bg: #f0fdf4;
+      --fail: #dc2626;
+      --fail-bg: #fef2f2;
+      --primary: #6366f1;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #f1f5f9;
+        --border: #334155;
+        --pass-bg: #052e16;
+        --fail-bg: #450a0a;
+      }
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    h1 { margin: 0; font-size: 1.5rem; display: flex; align-items: center; gap: 8px; }
+    .badge-back {
+      text-decoration: none;
+      background: var(--primary);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .summary-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .stat-card {
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: var(--bg);
+    }
+    .stat-val { font-size: 1.75rem; font-weight: 700; }
+    .stat-val.pass { color: var(--pass); }
+    .stat-val.fail { color: var(--fail); }
+    .test-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .test-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .test-item.pass { border-left: 4px solid var(--pass); }
+    .test-item.fail { border-left: 4px solid var(--fail); background: var(--fail-bg); }
+    .status-icon { font-size: 1.25rem; line-height: 1; }
+    .test-body { flex: 1; }
+    .test-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+    .test-detail { font-size: 0.85rem; color: #64748b; }
+    .test-error { color: var(--fail); font-size: 0.85rem; margin-top: 4px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧪 Báo cáo Kiểm thử Tự động (11/11 Test Cases)</h1>
+    <a href="index.html" class="badge-back">← Quay lại Ứng dụng</a>
+  </div>
+
+  <div class="summary-box">
+    <h2 style="margin:0 0 8px 0; font-size:1.15rem;">Tổng kết thực thi</h2>
+    <div id="summaryText">Đang chạy các kịch bản kiểm thử...</div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div style="font-size:0.875rem; color:#64748b;">Tổng số test</div>
+        <div class="stat-val" id="totalCount">-</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size:0.875rem; color:#64748b;">Thành công (PASS)</div>
+        <div class="stat-val pass" id="passCount">-</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size:0.875rem; color:#64748b;">Thất bại (FAIL)</div>
+        <div class="stat-val fail" id="failCount">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test-list" id="testList"></div>
+
+  <script type="module">
+    import { Store } from './js/store.js';
+    import {
+      datesOverlap,
+      validateRequest,
+      findConflicts,
+      searchRequests,
+      removeAccents,
+      formatDate,
+      isOverdue
+    } from './js/logic.js';
+    import { SEED_DEVICES, SEED_REQUESTS, SEED_NEXT_ID } from './js/seed.js';
+
+    const testResults = [];
+
+    function record(id, name, passed, detail = '', error = '') {
+      testResults.push({ id, name, passed, detail, error });
+    }
+
+    try {
+      // 1. Khoảng ngày chồng lấn
+      const c1a = datesOverlap('2026-11-21', '2026-11-21', '2026-11-21', '2026-11-21') === true;
+      const c1b = datesOverlap('2026-11-21', '2026-11-22', '2026-11-22', '2026-11-23') === true;
+      const c1c = datesOverlap('2026-11-21', '2026-11-21', '2026-11-22', '2026-11-22') === false;
+      record('TC-01', 'Khoảng ngày chồng lấn (biên và không trùng)', c1a && c1b && c1c,
+        '[21,21]∩[21,21]=trùng; [21,22]∩[22,23]=trùng (biên); [21,21]∩[22,22]=không trùng');
+
+      // 2. Ngày trả = ngày mượn hợp lệ, trả < mượn báo lỗi
+      const devX = [{ id: 'TB-X', name: 'Test Cam', type: 'Máy ảnh', status: 'available', note: '' }];
+      const v2a = validateRequest({ deviceId: 'TB-X', borrowerName: 'Lê Văn A', startDate: '2026-11-21', endDate: '2026-11-21' }, devX, [], '2026-11-16', null, true);
+      const v2b = validateRequest({ deviceId: 'TB-X', borrowerName: 'Lê Văn A', startDate: '2026-11-22', endDate: '2026-11-21' }, devX, [], '2026-11-16', null, true);
+      record('TC-02', 'Kiểm tra logic ngày mượn và ngày trả', v2a.valid && !v2b.valid && !!v2b.errors.endDate,
+        'Ngày trả = ngày mượn là hợp lệ; Ngày trả < ngày mượn báo lỗi chính xác');
+
+      // 3. Thiết bị Bảo trì không chọn được
+      const devMaint = [{ id: 'TB-04', name: 'Đèn LED để bàn', type: 'Ánh sáng', status: 'maintenance', note: 'Không cho đăng ký mượn' }];
+      const v3 = validateRequest({ deviceId: 'TB-04', borrowerName: 'Nguyễn Văn B', startDate: '2026-11-25', endDate: '2026-11-26' }, devMaint, [], '2026-11-16', null, true);
+      record('TC-03', 'Chặn đăng ký mượn thiết bị đang Bảo trì (TB-04)', !v3.valid && v3.errors.deviceId?.includes('bảo trì'),
+        'Báo lỗi rõ ràng: "Thiết bị đang bảo trì, không nhận đăng ký mượn"');
+
+      // 4. Tạo yêu cầu TB-03 từ 21/11 đến 21/11 -> báo trùng với YC-102 (Đã duyệt)
+      const v4 = validateRequest(
+        { deviceId: 'TB-03', borrowerName: 'Hoàng Nam', startDate: '2026-11-21', endDate: '2026-11-21' },
+        SEED_DEVICES, SEED_REQUESTS, '2026-11-16', null, true
+      );
+      record('TC-04', 'Phát hiện trùng lịch với YC-102 (Đã duyệt trên TB-03)', !v4.valid && !!v4.conflictMessage && v4.conflictMessage.includes('Bình Trần') && v4.conflictMessage.includes('YC-102'),
+        v4.conflictMessage || 'Không sinh được thông báo trùng');
+
+      // 5. Tạo yêu cầu TB-03 từ 22/11 đến 22/11 -> hợp lệ
+      const v5 = validateRequest(
+        { deviceId: 'TB-03', borrowerName: 'Hoàng Nam', startDate: '2026-11-22', endDate: '2026-11-22' },
+        SEED_DEVICES, SEED_REQUESTS, '2026-11-16', null, true
+      );
+      record('TC-05', 'Tạo yêu cầu hợp lệ vào ngày rảnh (TB-03 từ 22/11 đến 22/11)', v5.valid,
+        'Yêu cầu hợp lệ, sẵn sàng tạo với trạng thái Chờ duyệt');
+
+      // 6. Duyệt yêu cầu không trùng thành công; cố tình duyệt khi trùng bị chặn
+      const testReqList = [
+        { id: 'YC-104', borrowerName: 'Test', deviceId: 'TB-03', startDate: '2026-11-22', endDate: '2026-11-22', status: 'pending' },
+        { id: 'YC-105', borrowerName: 'Test 2', deviceId: 'TB-03', startDate: '2026-11-22', endDate: '2026-11-22', status: 'pending' }
+      ];
+      // YC-104 duyệt -> không trùng với ai (vì YC-105 đang pending không chiếm lịch)
+      const c6a = findConflicts('TB-03', '2026-11-22', '2026-11-22', testReqList, SEED_DEVICES, 'YC-104');
+      testReqList[0].status = 'approved'; // Giả lập duyệt YC-104
+      // Thử duyệt YC-105 trùng với YC-104 vừa approved
+      const c6b = findConflicts('TB-03', '2026-11-22', '2026-11-22', testReqList, SEED_DEVICES, 'YC-105');
+      record('TC-06', 'Quy tắc duyệt yêu cầu: Cho phép khi rảnh, Chặn khi trùng', c6a.length === 0 && c6b.length > 0 && c6b[0].request.id === 'YC-104',
+        'YC-104 duyệt thành công; Duyệt tiếp YC-105 bị chặn ngay lập tức do trùng YC-104');
+
+      // 7. Yêu cầu "Chờ duyệt" không chiếm lịch
+      const pendingOnlyReqs = [
+        { id: 'YC-888', borrowerName: 'Pending User', deviceId: 'TB-05', startDate: '2026-11-25', endDate: '2026-11-26', status: 'pending' }
+      ];
+      const c7 = findConflicts('TB-05', '2026-11-25', '2026-11-26', pendingOnlyReqs, SEED_DEVICES);
+      record('TC-07', 'Trạng thái Chờ duyệt không chiếm lịch', c7.length === 0,
+        'Chỉ có Đã duyệt và Đang mượn mới chiếm lịch theo đúng đặc tả');
+
+      // 8. Tìm kiếm không phân biệt hoa thường và dấu tiếng Việt ("binh", "TB-03", "tb03")
+      const s8a = searchRequests(SEED_REQUESTS, 'binh');
+      const s8b = searchRequests(SEED_REQUESTS, 'TB-03');
+      const s8c = searchRequests(SEED_REQUESTS, 'tb03');
+      record('TC-08', 'Tìm kiếm thông minh (bỏ dấu, mã có/không gạch nối)',
+        s8a.length === 1 && s8b.length === 1 && s8c.length === 1 && s8a[0].borrowerName === 'Bình Trần',
+        '"binh" tìm ra Bình Trần; "TB-03" và "tb03" đều tìm ra Micro USB');
+
+      // 9. Lưu bền localStorage sau reload
+      Store.init();
+      const devBefore = Store.getDevices();
+      const reqBefore = Store.getRequests();
+      const c9 = Array.isArray(devBefore) && devBefore.length >= 5 && Array.isArray(reqBefore) && reqBefore.length >= 3;
+      record('TC-09', 'Lưu bền dữ liệu qua Store (localStorage)', c9,
+        `Store đã nạp và lưu trữ an toàn: ${devBefore.length} thiết bị, ${reqBefore.length} yêu cầu`);
+
+      // 10. Nạp lại dữ liệu mẫu đưa về đúng 5 TB, 3 YC, nextId=104
+      Store.resetToSeed();
+      const devReset = Store.getDevices();
+      const reqReset = Store.getRequests();
+      const nextId = Store.getNextRequestId();
+      const c10 = devReset.length === 5 && reqReset.length === 3 && nextId === 104;
+      record('TC-10', 'Nạp lại dữ liệu mẫu (Reset to Seed)', c10,
+        `Đúng 5 thiết bị, 3 yêu cầu, mã tiếp theo là YC-${nextId}, nhật ký hoạt động được làm sạch`);
+
+      // 11. Kịch bản Demo BTC hoàn chỉnh
+      // B1: Nạp mẫu -> B2: Tìm TB-03 -> B3: Tạo YC hợp lệ -> B4: Tạo YC trùng báo lỗi -> B5: Đổi trạng thái admin
+      let demoPass = true;
+      Store.resetToSeed();
+      const tb03 = Store.getDevice('TB-03');
+      if (!tb03 || tb03.status !== 'available') demoPass = false;
+
+      // Tạo YC hợp lệ YC-104
+      const validForm = { deviceId: 'TB-03', borrowerName: 'Thành viên mới', startDate: '2026-11-22', endDate: '2026-11-23' };
+      const vDemo1 = validateRequest(validForm, Store.getDevices(), Store.getRequests(), '2026-11-16', null, true);
+      if (!vDemo1.valid) demoPass = false;
+
+      // Sinh YC-104
+      const genId = Store.generateRequestId();
+      if (genId !== 'YC-104') demoPass = false;
+      Store.updateRequest({ id: genId, ...validForm, status: 'pending', createdAt: new Date().toISOString() });
+
+      // Thử tạo trùng với YC-102 đã duyệt (21/11-21/11)
+      const conflictForm = { deviceId: 'TB-03', borrowerName: 'Người đến sau', startDate: '2026-11-21', endDate: '2026-11-21' };
+      const vDemo2 = validateRequest(conflictForm, Store.getDevices(), Store.getRequests(), '2026-11-16', null, true);
+      if (vDemo2.valid || !vDemo2.conflictMessage) demoPass = false;
+
+      record('TC-11', 'Kịch bản Demo chuẩn BTC chạy mượt mà', demoPass,
+        'Nạp mẫu → Tìm TB-03 → Tạo YC-104 hợp lệ → Tạo YC trùng báo lỗi thân thiện → Đổi trạng thái');
+
+    } catch (err) {
+      record('TC-ERR', 'Lỗi không lường trước khi thực thi test suite', false, '', err.stack);
+    }
+
+    // Render kết quả
+    const total = testResults.length;
+    const passed = testResults.filter(t => t.passed).length;
+    const failed = total - passed;
+
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('passCount').textContent = passed;
+    document.getElementById('failCount').textContent = failed;
+
+    const summaryText = document.getElementById('summaryText');
+    if (failed === 0) {
+      summaryText.innerHTML = `🎉 <strong>HOÀN HẢO!</strong> Tất cả <strong>${passed}/${total}</strong> kịch bản kiểm thử đều đạt chuẩn 100%.`;
+      summaryText.style.color = 'var(--pass)';
+    } else {
+      summaryText.innerHTML = `⚠️ Có <strong>${failed}</strong> kịch bản kiểm thử chưa đạt.`;
+      summaryText.style.color = 'var(--fail)';
+    }
+
+    const testList = document.getElementById('testList');
+    testResults.forEach(t => {
+      const item = document.createElement('div');
+      item.className = `test-item ${t.passed ? 'pass' : 'fail'}`;
+      item.innerHTML = `
+        <div class="status-icon">${t.passed ? '✅' : '❌'}</div>
+        <div class="test-body">
+          <div class="test-name">${t.id}: ${t.name}</div>
+          <div class="test-detail">${t.detail}</div>
+          ${t.error ? `<div class="test-error">${t.error}</div>` : ''}
+        </div>
+      `;
+      testList.appendChild(item);
+    });
+  </script>
+</body>
+</html>

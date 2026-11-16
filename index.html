@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6366f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Quản lý mượn thiết bị CLB sinh viên - Biết ngay thiết bị nào đang ở đâu">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MượnĐồ">
+  <title>MượnĐồ - Quản lý mượn thiết bị CLB</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── HEADER ──────────────────────────────────────── -->
+  <header class="app-header" role="banner">
+    <div class="header-brand">
+      <span class="app-icon" aria-hidden="true">📦</span>
+      <span class="app-name">MượnĐồ</span>
+      <span class="app-tagline">Biết ngay thiết bị nào đang ở đâu</span>
+    </div>
+    <div class="header-actions">
+      <!-- Role toggle -->
+      <div class="role-toggle" id="roleToggle" role="group" aria-label="Chọn vai trò">
+        <button class="role-btn active"
+                data-role="member"
+                aria-pressed="true">Thành viên</button>
+        <button class="role-btn"
+                data-role="admin"
+                aria-pressed="false">Người phụ trách</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── SIDE NAV (desktop, rendered by JS on ≥1024px) ── -->
+  <nav class="side-nav" id="sideNav" aria-label="Điều hướng bên" hidden>
+    <a href="#devices" class="side-nav-item active" data-page="devices">
+      <svg class="side-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      Thiết bị
+    </a>
+    <a href="#borrow" class="side-nav-item" data-page="borrow">
+      <svg class="side-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M12 5v14M5 12l7-7 7 7"/>
+      </svg>
+      Mượn thiết bị
+    </a>
+    <a href="#requests" class="side-nav-item" data-page="requests">
+      <svg class="side-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span id="sideNavRequestsLabel">Yêu cầu</span>
+    </a>
+    <a href="#dashboard" class="side-nav-item" data-page="dashboard">
+      <svg class="side-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+      </svg>
+      Thống kê
+    </a>
+  </nav>
+
+  <!-- ── MAIN CONTENT ─────────────────────────────────── -->
+  <main class="app-main" id="appMain" role="main" aria-live="polite">
+    <!--
+      Nội dung được inject bởi JS router.
+
+      Các "trang" (views) được render bằng innerHTML từ app.js:
+        #devices   – Danh sách thiết bị + tìm kiếm + filter
+        #borrow    – Form đăng ký mượn
+        #requests  – Bảng / danh sách yêu cầu
+        #dashboard – Thống kê + lịch
+
+      Mỗi view được wrap trong:
+        <section class="page-view" data-page="...">
+          ...
+        </section>
+
+      ── Devices view skeleton (reference) ────────────────
+      <section class="page-view" data-page="devices">
+        <div class="section-header">
+          <h1 class="section-title">Thiết bị</h1>
+          <button class="btn btn-primary btn-sm" id="btnAddDevice">+ Thêm</button>
+        </div>
+
+        <div class="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="search" class="form-control" placeholder="Tìm thiết bị…" aria-label="Tìm kiếm thiết bị">
+        </div>
+
+        <div class="filter-chips" role="group" aria-label="Lọc theo trạng thái">
+          <button class="chip active" data-filter="all">Tất cả</button>
+          <button class="chip" data-filter="available">
+            <span class="badge badge-available">Sẵn sàng</span>
+          </button>
+          <button class="chip" data-filter="borrowing">
+            <span class="badge badge-borrowing">Đang mượn</span>
+          </button>
+          <button class="chip" data-filter="maintenance">
+            <span class="badge badge-maintenance">Bảo trì</span>
+          </button>
+        </div>
+
+        <div class="device-grid" id="deviceGrid">
+          ── device-card × N ──
+        </div>
+      </section>
+
+      ── Device card (reference) ──────────────────────────
+      <article class="device-card">
+        <div class="device-card-header">
+          <span class="badge badge-available">Sẵn sàng</span>
+        </div>
+        <div class="device-id monospace">TB-01</div>
+        <div class="device-name">Máy ảnh Lumix G7</div>
+        <div class="device-type text-muted text-sm">Máy ảnh</div>
+        <div class="device-note">Kèm pin và thẻ nhớ</div>
+        <div class="device-card-actions">
+          <button class="btn btn-primary btn-sm">Mượn</button>
+          <button class="btn btn-secondary btn-sm">Chi tiết</button>
+        </div>
+      </article>
+
+      ── Badge usage (reference) ──────────────────────────
+      Status                Vietnamese label          CSS class
+      ─────────────────────────────────────────────────────
+      available             Sẵn sàng                  badge-available
+      borrowing             Đang mượn                 badge-borrowing
+      maintenance           Bảo trì                   badge-maintenance
+      pending               Chờ duyệt                 badge-pending
+      approved              Đã duyệt                  badge-approved
+      returned              Đã trả                    badge-returned
+      rejected              Từ chối                   badge-rejected
+
+      ── Borrow form (reference) ──────────────────────────
+      <section class="page-view" data-page="borrow">
+        <div class="section-header">
+          <h1 class="section-title">Đăng ký mượn</h1>
+        </div>
+        <div class="borrow-form-wrap">
+          <form id="borrowForm" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="borrowerName">
+                Họ tên <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input id="borrowerName" type="text" class="form-control"
+                     placeholder="Nhập họ tên…" autocomplete="name" required>
+              <span class="form-error" role="alert" hidden>Vui lòng nhập họ tên</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="deviceSelect">
+                Thiết bị <span class="required" aria-hidden="true">*</span>
+              </label>
+              <select id="deviceSelect" class="form-control" required>
+                <option value="">— Chọn thiết bị —</option>
+              </select>
+              <span class="form-error" role="alert" hidden>Vui lòng chọn thiết bị</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="startDate">Ngày mượn <span class="required">*</span></label>
+              <input id="startDate" type="date" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="endDate">Ngày trả <span class="required">*</span></label>
+              <input id="endDate" type="date" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="borrowNote">Ghi chú</label>
+              <textarea id="borrowNote" class="form-control" rows="3"
+                        placeholder="Mục đích sử dụng, yêu cầu đặc biệt…"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+              Gửi yêu cầu mượn
+            </button>
+          </form>
+        </div>
+      </section>
+
+      ── Requests table / list (reference) ────────────────
+      Desktop:
+        <div class="requests-table-wrap">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>Mã YC</th><th>Người mượn</th><th>Thiết bị</th>
+                <th>Ngày mượn</th><th>Ngày trả</th><th>Trạng thái</th><th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="monospace">YC-101</td>
+                <td>An Nguyễn</td>
+                <td>Chân máy mini</td>
+                <td>22/11/2026</td>
+                <td>23/11/2026</td>
+                <td><span class="badge badge-pending">Chờ duyệt</span></td>
+                <td>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-success btn-sm">Duyệt</button>
+                    <button class="btn btn-danger btn-sm">Từ chối</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      Mobile:
+        <div class="requests-list">
+          <div class="request-card">
+            <div class="request-card-row">
+              <span class="monospace text-sm">YC-101</span>
+              <span class="badge badge-pending">Chờ duyệt</span>
+            </div>
+            <div class="request-card-row">
+              <span class="request-card-label">Người mượn</span>
+              <strong>An Nguyễn</strong>
+            </div>
+            <div class="request-card-row">
+              <span class="request-card-label">Thiết bị</span>
+              <span>Chân máy mini</span>
+            </div>
+            <div class="request-card-row">
+              <span class="request-card-label">Thời gian</span>
+              <span>22/11 – 23/11/2026</span>
+            </div>
+            <div class="request-card-actions">
+              <button class="btn btn-success btn-sm">Duyệt</button>
+              <button class="btn btn-danger btn-sm">Từ chối</button>
+              <button class="btn btn-secondary btn-sm">Xác nhận trả</button>
+            </div>
+          </div>
+        </div>
+
+      ── Dashboard view (reference) ───────────────────────
+      <section class="page-view" data-page="dashboard">
+        <div class="section-header">
+          <h1 class="section-title">Thống kê</h1>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value">5</div>
+            <div class="stat-label">Tổng thiết bị</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value">3</div>
+            <div class="stat-label">Sẵn sàng</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📤</div>
+            <div class="stat-value">1</div>
+            <div class="stat-label">Đang mượn</div>
+          </div>
+          <div class="stat-card overdue">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value">0</div>
+            <div class="stat-label">Quá hạn</div>
+          </div>
+        </div>
+
+        ── 30-day calendar ──
+        <div class="calendar-wrap">
+          <div class="calendar-title">Lịch 30 ngày tới</div>
+          <div class="calendar-weekdays">
+            <div class="calendar-weekday">CN</div>
+            <div class="calendar-weekday">T2</div>
+            <div class="calendar-weekday">T3</div>
+            <div class="calendar-weekday">T4</div>
+            <div class="calendar-weekday">T5</div>
+            <div class="calendar-weekday">T6</div>
+            <div class="calendar-weekday">T7</div>
+          </div>
+          <div class="calendar-grid" id="calGrid">
+            ── cal-day cells rendered by JS ──
+          </div>
+        </div>
+      </section>
+
+      ── Empty state (reference) ──────────────────────────
+      <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h3>Không tìm thấy thiết bị</h3>
+        <p>Thử thay đổi bộ lọc hoặc từ khoá tìm kiếm.</p>
+        <button class="btn btn-primary">Xem tất cả</button>
+      </div>
+
+      ── Toast (reference — created by JS, appended to #toastContainer) ──
+      <div class="toast toast-success" role="alert">
+        <span class="toast-icon">✅</span>
+        <div class="toast-body">
+          <div class="toast-title">Thành công</div>
+          <div class="toast-msg">Yêu cầu đã được gửi</div>
+        </div>
+      </div>
+    -->
+
+    <!-- Loading skeleton shown until JS initialises -->
+    <div id="loadingPlaceholder" aria-label="Đang tải…" aria-busy="true">
+      <div class="section-header">
+        <div class="skeleton skeleton-text" style="width:120px;height:22px"></div>
+      </div>
+      <div class="device-grid">
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── TOAST CONTAINER ───────────────────────────────── -->
+  <div id="toastContainer"
+       class="toast-container"
+       aria-live="polite"
+       aria-atomic="true"
+       role="status"></div>
+
+  <!-- ── CONFIRM DIALOG ────────────────────────────────── -->
+  <div id="dialogOverlay"
+       class="dialog-overlay hidden"
+       role="presentation">
+    <div class="dialog"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="dialogTitle"
+         aria-describedby="dialogMessage">
+      <p class="dialog-title" id="dialogTitle">Xác nhận</p>
+      <p class="dialog-message" id="dialogMessage"></p>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="dialogCancel">Hủy</button>
+        <button class="btn btn-danger"    id="dialogConfirm">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BOTTOM NAVIGATION (mobile / tablet) ───────────── -->
+  <nav class="bottom-nav"
+       id="bottomNav"
+       aria-label="Điều hướng chính">
+
+    <a href="#devices" class="nav-item active" data-page="devices"
+       aria-current="page" aria-label="Thiết bị">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <path d="M8 21h8M12 17v4"/>
+      </svg>
+      <span class="nav-label">Thiết bị</span>
+    </a>
+
+    <a href="#borrow" class="nav-item" data-page="borrow"
+       aria-label="Đăng ký mượn">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M12 5v14M5 12l7-7 7 7"/>
+      </svg>
+      <span class="nav-label">Mượn</span>
+    </a>
+
+    <a href="#requests" class="nav-item" data-page="requests"
+       aria-label="Danh sách yêu cầu">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0
+                 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0
+                 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span class="nav-label" id="navRequestsLabel">Yêu cầu</span>
+    </a>
+
+    <a href="#dashboard" class="nav-item" data-page="dashboard"
+       aria-label="Thống kê">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+      </svg>
+      <span class="nav-label">Thống kê</span>
+    </a>
+
+  </nav>
+
+  <!-- ── STORAGE WARNING ───────────────────────────────── -->
+  <div id="storageWarning"
+       class="storage-warning hidden"
+       role="alert"
+       aria-live="assertive">
+    ⚠️ Không thể lưu dữ liệu. Trình duyệt đã tắt localStorage.
+    Dữ liệu sẽ mất khi tải lại trang.
+  </div>
+
+  <!-- ── SCRIPTS ────────────────────────────────────────── -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
